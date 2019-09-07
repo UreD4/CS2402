@@ -1,2 +1,2 @@
-# CS2402
+# CS2302
 Thomas Roque
