@@ -1,0 +1,292 @@
+from timeit import default_timer as timer 
+from itertools import islice
+import matplotlib.pyplot as plt
+import numpy as np
+import math
+
+##########################################################################################################################
+## Classes ###############################################################################################################
+##########################################################################################################################
+class BST(object):
+    # Constructor
+    def __init__(self, data, left=None, right=None):  
+        self.data = data
+        self.left = left 
+        self.right = right      
+
+class BTree(object):
+    # Constructor
+    def __init__(self,data,child=[],isLeaf=True,max_data=5):  
+        self.data = data
+        self.child = child 
+        self.isLeaf = isLeaf
+        if max_data <3: #max_data must be odd and greater or equal to 3
+            max_data = 3
+        if max_data%2 == 0: #max_data must be odd and greater or equal to 3
+            max_data +=1
+        self.max_data = max_data
+
+        
+##########################################################################################################################
+##PRE DEFINED METHODS B-Tree #############################################################################################
+##########################################################################################################################
+def FindChild(T,k):
+    # Determines value of c, such that k must be in subtree T.child[c], if k is in the BTree   
+    for i in range(len(T.data)):
+        if k < T.data[i]:
+            return i
+    return len(T.data)
+             
+def InsertInternal(T,i):
+    # T cannot be Full
+    if T.isLeaf:
+        InsertLeaf(T,i)
+    else:
+        k = FindChild(T,i)   
+        if IsFull(T.child[k]):
+            m, l, r = Split(T.child[k])
+            T.data.insert(k,m) 
+            T.child[k] = l
+            T.child.insert(k+1,r) 
+            k = FindChild(T,i)  
+        InsertInternal(T.child[k],i)   
+            
+def Split(T):
+    #print('Splitting')
+    #PrintNode(T)
+    mid = T.max_data//2
+    if T.isLeaf:
+        leftChild = BTree(T.data[:mid],max_data=T.max_data) 
+        rightChild = BTree(T.data[mid+1:],max_data=T.max_data) 
+    else:
+        leftChild = BTree(T.data[:mid],T.child[:mid+1],T.isLeaf,max_data=T.max_data) 
+        rightChild = BTree(T.data[mid+1:],T.child[mid+1:],T.isLeaf,max_data=T.max_data) 
+    return T.data[mid], leftChild,  rightChild   
+      
+def InsertLeaf(T,i):
+    T.data.append(i)  
+    T.data.sort()
+
+def IsFull(T):
+    return len(T.data) >= T.max_data
+
+def Leaves(T):
+    # Returns the leaves in a b-tree
+    if T.isLeaf:
+        return [T.data]
+    s = []
+    for c in T.child:
+        s = s + Leaves(c)
+    return s
+
+        
+def InsertBT(T,i):
+    if not IsFull(T):
+        InsertInternal(T,i)
+    else:
+        m, l, r = Split(T)
+        T.data =[m]
+        T.child = [l,r]
+        T.isLeaf = False
+        k = FindChild(T,i)  
+        InsertInternal(T.child[k],i)   
+     
+def Height(T):
+    if T.isLeaf:
+        return 0
+    return 1 + Height(T.child[0])    
+    
+def Print(T):
+    # Prints data in tree in ascending order
+    if T.isLeaf:
+        for t in T.data:
+            print(t,end=' ')
+    else:
+        for i in range(len(T.data)):
+            Print(T.child[i])
+            print(T.data[i],end=' ')
+        Print(T.child[len(T.data)])    
+         
+def PrintD(T,space):
+    # Prints data and structure of B-tree
+    if T.isLeaf:
+        for i in range(len(T.data)-1,-1,-1):
+            print(space,T.data[i])
+    else:
+        PrintD(T.child[len(T.data)],space+'   ')  
+        for i in range(len(T.data)-1,-1,-1):
+            print(space,T.data[i])
+            PrintD(T.child[i],space+'   ')
+ 
+def Search(T,k):
+    # Returns node where k is, or None if k is not in the tree
+    if k in T.data:
+        return T
+    if T.isLeaf:
+        return None
+    return Search(T.child[FindChild(T,k)],k)
+
+def Set_x(T,Dx):
+    # Finds x-coordinate to display each node in the tree
+    if T.isLeaf:
+        return 
+    else:
+        for c in T.child:
+            Set_x(c,Dx)
+        d = (Dx[T.child[0].data[0]] + Dx[T.child[-1].data[0]] + 10*len(T.child[-1].data))/2
+        Dx[T.data[0]] = d - 10*len(T.data)/2
+
+
+
+
+
+    
+    
+   
+
+
+##########################################################################################################################
+##PRE DEFINED METHODS BST ################################################################################################
+##########################################################################################################################
+
+def Insert(T,newdata):
+    if T == None:
+        T =  BST(newdata)
+    elif T.data > newdata:
+        T.left = Insert(T.left,newdata)
+    else:
+        T.right = Insert(T.right,newdata)
+    return T
+
+def InOrder(T):
+    if T is not None:
+        InOrder(T.left)
+        print(T.data,end=' ')
+        InOrder(T.right)
+        
+def ShowBST(T,ind):
+    # Display rotated BST in text form
+    if T is not None:
+        ShowBST(T.right,ind+'   ')
+        print(ind, T.data)
+        ShowBST(T.left,ind+'   ')
+
+def DrawBST_(T, x0, x1, y, y_inc,ax):
+    if T is not None:
+        xm = (x0+x1)/2
+        yn = y-y_inc
+        if T.left is not None:
+            p=np.array([[xm,y], [(x0+xm)/2,yn]])
+            ax.plot(p[:,0],p[:,1],linewidth=1,color='k')
+            DrawBST_(T.left,x0,xm,yn, y_inc,ax)
+        if T.right is not None:
+            p=np.array([[xm,y], [(x1+xm)/2,yn]])
+            ax.plot(p[:,0],p[:,1],linewidth=1,color='k')
+            DrawBST_(T.right,xm,x1,yn, y_inc,ax)
+        ax.plot([xm,xm],[y,y],linewidth=1,color='k')
+        ax.text(xm,y, str(T.data), size=10,ha="center", va="center",
+            bbox=dict(facecolor='w',boxstyle="circle"))
+
+
+    
+##########################################################################################################################
+##########################################################################################################################
+
+
+
+
+
+
+
+
+
+##########################################################################################################################
+##  MAIN SECTION    ######################################################################################################
+##########################################################################################################################
+
+def DrawBST(T): 
+    #
+    fig, ax = plt.subplots()
+    DrawBST_(T, 0, 200, 400, 20, ax)
+    ax.set_aspect(1.0)
+    ax.axis('off') 
+    plt.show() 
+
+def load_wordsBST(WORDLIST_FILENAME):
+    print ("Loading word list from file...")
+    T=BST(None)
+    with open('glove.6B.50d.txt', 'r',encoding="utf8") as file:
+        
+        lines = islice(file, 100)
+
+        #replace lines with file.readlines()
+        for line in lines:
+            row = line.strip().split(' ')
+            print('Adding the word: '+row[0])
+            if T.data is None:
+                T = BST(row[0])
+            else:
+                Insert(T,row[0])
+            
+        file.close()
+    DrawBST(T)
+
+
+def load_wordsBT(WORDLIST_FILENAME):
+    print ("Loading word list from file...")
+    T=BST(None)
+    with open('glove.6B.50d.txt', 'r',encoding="utf8") as file:
+        
+        lines = islice(file, 100)
+
+        #replace lines with file.readlines()
+        for line in lines:
+            row = line.strip().split(' ')
+            print('Adding the word: '+row[0])
+            if T.data is None:
+                T = BTree(T,row[0])
+            else:
+                InsertBT(T,row[0])
+            
+        file.close()
+    DrawBST(T)
+
+
+
+
+
+#Chooses a tree and inits it with the word list
+def chooseTree():
+        isdone=False
+        while(isdone!=True):
+            print("What type of tree do you want?\n1: Binary Search\t2: Just Binary\n")
+            choice = input()
+            if int(choice)==1:
+                load_wordsBST('test')
+                isdone=True
+                return
+            if int(choice)==2:
+                nodeCount = input("What is the max per node?\n:")
+                
+                if int(nodeCount)>=3:
+                    load_wordsBT('test')
+                    isdone=True
+                else:
+                    print("Max must be odd and be greater than or equal to 3")
+                return
+            else:
+                print("Enter a number between 1 and 2 please")
+
+
+
+
+
+
+###  MAIN  #######
+chooseTree()
+
+
+
+
+##########################################################################################################################
+##########################################################################################################################
