@@ -1,9 +1,18 @@
-from timeit import default_timer as timer 
+'''
+Thomas Roque
+Lab 4
+CS2302 Data Structures
+MW 10:30
+Professor: Olac Fuentes
+TA: Anindita Nath
+'''
+
 from itertools import islice
 import matplotlib.pyplot as plt
 import numpy as np
 import math
-
+import time
+import re
 ##########################################################################################################################
 ## Classes ###############################################################################################################
 ##########################################################################################################################
@@ -25,17 +34,28 @@ class BTree(object):
         if max_data%2 == 0: #max_data must be odd and greater or equal to 3
             max_data +=1
         self.max_data = max_data
-
+class WordEmbed(object):
+    def __init__(self, word, embedding):
+        # word must be a string, embedding can be a list or and array of ints or floats
+        self.word = word
+        self.emb = np.array(embedding, dtype=np.float32) # For Lab 4, len(embedding=50)
         
 ##########################################################################################################################
 ##PRE DEFINED METHODS B-Tree #############################################################################################
 ##########################################################################################################################
+
 def FindChild(T,k):
     # Determines value of c, such that k must be in subtree T.child[c], if k is in the BTree   
-    for i in range(len(T.data)):
-        if k < T.data[i]:
-            return i
+    if isinstance(k, WordEmbed):
+        for i in range(len(T.data)):
+            if k.word < T.data[i].word:
+                return i
+    else:
+        for i in range(len(T.data)):
+            if k < T.data[i].word:
+                return i
     return len(T.data)
+
              
 def InsertInternal(T,i):
     # T cannot be Full
@@ -63,9 +83,11 @@ def Split(T):
         rightChild = BTree(T.data[mid+1:],T.child[mid+1:],T.isLeaf,max_data=T.max_data) 
     return T.data[mid], leftChild,  rightChild   
       
+
 def InsertLeaf(T,i):
     T.data.append(i)  
-    T.data.sort()
+    T.data.sort(key=lambda x: x.word)#needed to use embeded word
+
 
 def IsFull(T):
     return len(T.data) >= T.max_data
@@ -90,7 +112,7 @@ def InsertBT(T,i):
         T.isLeaf = False
         k = FindChild(T,i)  
         InsertInternal(T.child[k],i)   
-     
+    
 def Height(T):
     if T.isLeaf:
         return 0
@@ -120,11 +142,20 @@ def PrintD(T,space):
  
 def Search(T,k):
     # Returns node where k is, or None if k is not in the tree
-    if k in T.data:
-        return T
+    for x in range(0, len(T.data)):
+        if k == T.data[x].word:
+            return T.data[x]
     if T.isLeaf:
         return None
-    return Search(T.child[FindChild(T,k)],k)
+    return Search(T.child[FindChildSearch(T,k)],k)
+
+
+def FindChildSearch(T,k):
+    # Determines value of c, such that k must be in subtree T.child[c], if k is in the BTree   
+    for i in range(len(T.data)):
+        if k < T.data[i].word:
+            return i
+    return len(T.data)
 
 def Set_x(T,Dx):
     # Finds x-coordinate to display each node in the tree
@@ -137,8 +168,44 @@ def Set_x(T,Dx):
         Dx[T.data[0]] = d - 10*len(T.data)/2
 
 
-
-
+    
+def DrawBtree_(T, Dx, y, y_inc, fs, ax):
+    # Function to display b-tree to the screen 
+    # It works fine for trees with up to about 70 data
+    xs = Dx[T.data[0]]
+    if T.isLeaf:
+        for itm in T.data:
+            ax.plot([xs,xs+10,xs+10,xs,xs],[y,y,y-10,y-10,y],linewidth=1,color='k')
+            ax.text(xs+5,y-5, str(itm), ha="center", va="center",fontsize=fs)
+            xs +=10
+    else:
+        for i in range(len(T.data)):
+            xc = Dx[T.child[i].data[0]] + 5*len(T.child[i].data)
+            ax.plot([xs,xs+10,xs+10,xs,xs],[y,y,y-10,y-10,y],linewidth=1,color='k')
+            ax.text(xs+5,y-5, str(T.data[i]), ha="center", va="center",fontsize=fs)
+            ax.plot([xs,xc],[y-10,y-y_inc],linewidth=1,color='k')
+            DrawBtree_(T.child[i], Dx, y-y_inc, y_inc, fs, ax)
+            xs +=10
+        xc = Dx[T.child[-1].data[0]] + 5*len(T.child[-1].data)
+        ax.plot([xs,xc],[y-10,y-y_inc],linewidth=1,color='k')
+        DrawBtree_(T.child[-1], Dx, y-y_inc, y_inc, fs, ax)
+    
+def DrawBtree(T):
+    #Find x-coordinates of leaves    
+    LL = Leaves(T)
+    Dx ={}
+    d =0
+    for L in LL:
+        Dx[L[0]]=d 
+        d += 10*(len(L)+1)  
+    #Find x-coordinates of internal nodes
+    Set_x(T,Dx)    
+    #plt.close('all')
+    fig, ax = plt.subplots()
+    DrawBtree_(T, Dx, 0, 30, 10, ax)
+    ax.set_aspect(1.0)
+    ax.axis('off') 
+    plt.show()
 
     
     
@@ -149,13 +216,13 @@ def Set_x(T,Dx):
 ##PRE DEFINED METHODS BST ################################################################################################
 ##########################################################################################################################
 
-def Insert(T,newdata):
+def Insert(T,newItem):
     if T == None:
-        T =  BST(newdata)
-    elif T.data > newdata:
-        T.left = Insert(T.left,newdata)
+        T =  BST(newItem)
+    elif T.data.word > newItem.word:
+        T.left = Insert(T.left,newItem)
     else:
-        T.right = Insert(T.right,newdata)
+        T.right = Insert(T.right,newItem)
     return T
 
 def InOrder(T):
@@ -163,29 +230,7 @@ def InOrder(T):
         InOrder(T.left)
         print(T.data,end=' ')
         InOrder(T.right)
-        
-def ShowBST(T,ind):
-    # Display rotated BST in text form
-    if T is not None:
-        ShowBST(T.right,ind+'   ')
-        print(ind, T.data)
-        ShowBST(T.left,ind+'   ')
 
-def DrawBST_(T, x0, x1, y, y_inc,ax):
-    if T is not None:
-        xm = (x0+x1)/2
-        yn = y-y_inc
-        if T.left is not None:
-            p=np.array([[xm,y], [(x0+xm)/2,yn]])
-            ax.plot(p[:,0],p[:,1],linewidth=1,color='k')
-            DrawBST_(T.left,x0,xm,yn, y_inc,ax)
-        if T.right is not None:
-            p=np.array([[xm,y], [(x1+xm)/2,yn]])
-            ax.plot(p[:,0],p[:,1],linewidth=1,color='k')
-            DrawBST_(T.right,xm,x1,yn, y_inc,ax)
-        ax.plot([xm,xm],[y,y],linewidth=1,color='k')
-        ax.text(xm,y, str(T.data), size=10,ha="center", va="center",
-            bbox=dict(facecolor='w',boxstyle="circle"))
 
 
     
@@ -195,61 +240,190 @@ def DrawBST_(T, x0, x1, y, y_inc,ax):
 
 
 
-
-
-
-
-
 ##########################################################################################################################
 ##  MAIN SECTION    ######################################################################################################
 ##########################################################################################################################
+def Similarity(word0, word1):
+    dotProduct = np.dot(word0.emb,word1.emb)
+    magnitude = np.linalg.norm(word0.emb) * np.linalg.norm(word1.emb)
+    return dotProduct/magnitude
 
-def DrawBST(T): 
-    #
-    fig, ax = plt.subplots()
-    DrawBST_(T, 0, 200, 400, 20, ax)
-    ax.set_aspect(1.0)
-    ax.axis('off') 
-    plt.show() 
+#needed to spawn a file with words that i am testing
+def numItems(T):
+    sum = len(T.data)
+    if not T.isLeaf:
+        for i in range(len(T.child)):
+            sum+=numItems(T.child[i])
+    return sum
+
+def initJoe():
+    wordCheck=re.compile("[A-Za-z]+")
+    with open('glove.6B.50d.txt', 'r',encoding="utf8") as file:
+        lines = islice(file, 40)
+        # open file to read words from
+        # create new file to write to
+        with open('glove.6B.50d.txt', 'r',encoding="utf8") as file2:
+            new = open("joeText.txt", "w")
+            counter=0
+            for line in lines:
+                row = line.strip().split(' ')  
+                if wordCheck.fullmatch(row[0]) is not None:
+                    if counter%2==1:
+                        counter+=1
+                        new.write(row[0]+' '+"\n")
+                    else:
+                        counter+=1
+                        new.write(row[0]+' ')
+
+            file2.close()
+            new.close()
+
+def searchBST(T,key):
+    if T is None: 
+        return 
+    if T.data.word==key:
+        return T.data
+    if T.data.word < key:
+        return searchBST(T.right,key)
+    return searchBST(T.left,key)
+
+    
+
+def BSTHeight(T): 
+    if T is None: 
+        return 0
+    else :  
+        leftSide = BSTHeight(T.left) 
+        rightSide = BSTHeight(T.right) 
+        return max(leftSide,rightSide)+1
+
+def TreeCount(T):
+    sum=0
+    if T is not None:
+        sum+=1
+        sum= sum + TreeCount(T.left)
+        sum= sum + TreeCount(T.right)
+    return sum
+
 
 def load_wordsBST(WORDLIST_FILENAME):
-    print ("Loading word list from file...")
-    T=BST(None)
+    
+    # Pattern to be used to remove words with unwanted characters
+    wordCheck=re.compile("[A-Za-z]+")
     with open('glove.6B.50d.txt', 'r',encoding="utf8") as file:
-        
-        lines = islice(file, 100)
+        start = time.perf_counter()
+        lines = islice(file, 50)
+        #replace lines with file.readlines() for full file
+        T=None
+        for line in lines:
+            row = line.strip().split(' ')  
+            if wordCheck.fullmatch(row[0]) is not None:
+                T=Insert(T, WordEmbed(row[0],[(i) for i in row[1:]]))
+        # Stop timer
+        end = time.perf_counter()
+        file.close()
 
+
+    print('\nBuilding Binary Search Tree\n')
+    print('Binary Search Tree stats:')
+    print('Number of nodes:', TreeCount(T))
+    print('Height:', BSTHeight(T))
+    print('Running time for Binary Search Tree construction: '+ str(round((end - start), 6))+'\n')
+    
+    print("Reading word file to determine similarities\n")
+    print("Word similarities found:")
+    
+
+    ###############################################
+    initJoe()
+    start = time.time()
+    with open('joeText.txt', 'r',encoding="utf8") as file:
+        for line in file.readlines():
+            try:
+                row = line.strip().split(' ')
+                word2=row[0]
+                word3=row[1]
+                word0=searchBST(T,word2)
+                word1=searchBST(T,word3)
+                if word0 and word1 is not None:
+                    sim = Similarity(word0,word1)#need to search tree for embeded word version
+                print("Similarity [" + word2 + "," + word3 + "] = ", round(sim, 4)) 
+            except IndexError:
+                print()
+                break
+        Total = time.time() - start
+        file.close()
+    ###############################################
+
+    print("Running time for Binary Search Tree query processing: ", round(Total, 7))
+
+
+
+def load_wordsBT(WORDLIST_FILENAME,maxNum):   
+    wordCheck=re.compile("[A-Za-z]+")
+    with open('glove.6B.50d.txt', 'r',encoding="utf8") as file:
+        T = BTree([], [], max_data=int(maxNum)) # init
+        # Start counter
+        start = time.perf_counter()
+
+        lines = islice(file, 20)#LIMITS SIZE FOR TESTING
         #replace lines with file.readlines()
         for line in lines:
             row = line.strip().split(' ')
-            print('Adding the word: '+row[0])
-            if T.data is None:
-                T = BST(row[0])
-            else:
-                Insert(T,row[0])
-            
+            if wordCheck.fullmatch(row[0]) is not None:
+                InsertBT(T,WordEmbed(row[0],[(i) for i in row[1:]]))
+        # Stop counter
+        end = time.perf_counter()
         file.close()
-    DrawBST(T)
 
 
-def load_wordsBT(WORDLIST_FILENAME):
-    print ("Loading word list from file...")
-    T=BST(None)
-    with open('glove.6B.50d.txt', 'r',encoding="utf8") as file:
-        
-        lines = islice(file, 100)
 
-        #replace lines with file.readlines()
-        for line in lines:
-            row = line.strip().split(' ')
-            print('Adding the word: '+row[0])
-            if T.data is None:
-                T = BTree(T,row[0])
-            else:
-                InsertBT(T,row[0])
-            
+
+
+
+    print('\nBuilding B-Tree\n')
+    print('B-Tree stats:')
+    print('Number of nodes:', numItems(T))
+    print('Height:', Height(T))
+    print('Running time for B-Tree construction: '+ str(round((end - start), 6))+'\n')
+    
+    print("Reading word file to determine similarities\n")
+    print("Word similarities found:")
+    
+
+    ###############################################
+    initJoe()
+    start = time.time()
+    with open('joeText.txt', 'r',encoding="utf8") as file:
+        for line in file.readlines():
+            try:
+                row = line.strip().split(' ')
+                word2=row[0]
+                word3=row[1]
+                word0=Search(T,word2)
+                word1=Search(T,word3)
+                if word0 and word1 is not None:
+                    sim = Similarity(word0,word1)#need to search tree for embeded word version
+                print("Similarity [" + word2 + "," + word3 + "] = ", round(sim, 4)) 
+
+
+            except IndexError:
+                print()
+                break
+        Total = time.time() - start
         file.close()
-    DrawBST(T)
+    ###############################################
+
+    print("Running time for B-Tree query processing: ", round(Total, 7))
+    DrawBtree(T)
+
+
+
+
+
+
+
+
 
 
 
@@ -259,8 +433,8 @@ def load_wordsBT(WORDLIST_FILENAME):
 def chooseTree():
         isdone=False
         while(isdone!=True):
-            print("What type of tree do you want?\n1: Binary Search\t2: Just Binary\n")
-            choice = input()
+            print("Choose Table Implementation\nType 1 for Binary Search or 2 B-Tree")
+            choice = input("Choice:   ")
             if int(choice)==1:
                 load_wordsBST('test')
                 isdone=True
@@ -269,7 +443,7 @@ def chooseTree():
                 nodeCount = input("What is the max per node?\n:")
                 
                 if int(nodeCount)>=3:
-                    load_wordsBT('test')
+                    load_wordsBT('test',nodeCount)
                     isdone=True
                 else:
                     print("Max must be odd and be greater than or equal to 3")
